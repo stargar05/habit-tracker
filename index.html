@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Progress Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg: #0e0e0e;
+  --surface: #161616;
+  --surface2: #1e1e1e;
+  --border: rgba(255,255,255,0.07);
+  --text: #f0f0f0;
+  --muted: #555;
+  --muted2: #333;
+  --lime: #c5f135;
+  --orange: #e85d2a;
+  --blue: #2563eb;
+  --font-display: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { background: var(--bg); }
+body {
+  font-family: var(--font-display);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 24px 20px 60px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.top-bar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; gap: 12px; flex-wrap: wrap; }
+.top-title { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+.top-sub { font-size: 12px; color: var(--muted); font-family: var(--font-mono); margin-top: 2px; }
+.top-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.week-nav { display: flex; align-items: center; gap: 10px; }
+.wnav-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; width: 32px; height: 32px; cursor: pointer; color: var(--muted); font-size: 15px; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.wnav-btn:hover { background: var(--surface); color: var(--text); border-color: rgba(255,255,255,0.15); }
+.week-lbl { font-size: 12px; color: var(--muted); font-family: var(--font-mono); min-width: 140px; text-align: center; }
+
+.sync-status { font-size: 11px; font-family: var(--font-mono); display: flex; align-items: center; gap: 5px; }
+.sync-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.sync-dot.ok { background: var(--lime); }
+.sync-dot.saving { background: var(--orange); }
+.sync-dot.error { background: #e24b4a; }
+.sync-dot.loading { background: #555; animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.scores-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 28px; }
+.score-card { border-radius: 14px; padding: 16px 18px; }
+.score-card.daily { background: var(--lime); }
+.score-card.weekly { background: var(--orange); }
+.score-card.yearly { background: var(--blue); }
+.sc-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; opacity: .6; margin-bottom: 6px; font-family: var(--font-mono); }
+.score-card.daily .sc-label, .score-card.daily .sc-sub, .score-card.daily .sc-value { color: #1a2a00; }
+.score-card.weekly .sc-label, .score-card.weekly .sc-sub, .score-card.weekly .sc-value { color: #fff; }
+.score-card.yearly .sc-label, .score-card.yearly .sc-sub, .score-card.yearly .sc-value { color: #fff; }
+.sc-value { font-size: 32px; font-weight: 700; line-height: 1; letter-spacing: -.03em; }
+.sc-sub { font-size: 11px; opacity: .55; margin-top: 4px; font-family: var(--font-mono); }
+
+.section-lbl { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; font-family: var(--font-mono); margin-bottom: 12px; margin-top: 28px; display: flex; align-items: center; gap: 10px; }
+.section-lbl::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+.habits-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 10px; }
+
+.hcard { background: var(--surface); border-radius: 14px; padding: 14px; border: 1px solid var(--border); transition: border-color .15s, background .15s; user-select: none; }
+.hcard:hover { border-color: rgba(255,255,255,0.12); background: #1a1a1a; }
+.hcard-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.hcard-icon { font-size: 17px; color: var(--muted); }
+.hcard-streak { display: flex; align-items: center; gap: 3px; }
+.streak-num { font-size: 12px; font-weight: 500; font-family: var(--font-mono); }
+.hcard-name { font-size: 12px; color: #aaa; margin-bottom: 6px; font-weight: 500; letter-spacing: -.01em; }
+.hcard-count { display: flex; align-items: baseline; gap: 3px; margin-bottom: 8px; }
+.count-big { font-size: 30px; font-weight: 700; line-height: 1; letter-spacing: -.04em; }
+.count-max { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+.hbar-bg { width: 100%; height: 4px; background: var(--muted2); border-radius: 2px; overflow: hidden; margin-bottom: 8px; }
+.hbar-fill { height: 4px; border-radius: 2px; transition: width .4s cubic-bezier(.4,0,.2,1); }
+
+.count-row { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.cnt-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface2); color: #888; font-size: 17px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; font-family: var(--font-mono); transition: all .1s; flex-shrink: 0; }
+.cnt-btn:hover { background: var(--muted2); color: var(--text); }
+.cnt-btn:active { transform: scale(.94); }
+.cnt-display { flex: 1; text-align: center; font-size: 14px; font-weight: 500; color: var(--text); font-family: var(--font-mono); }
+
+.dots-row { display: flex; gap: 4px; margin-bottom: 10px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.milestone-row { display: flex; gap: 4px; flex-wrap: wrap; }
+.ms-badge { font-size: 10px; padding: 2px 6px; border-radius: 20px; font-weight: 500; font-family: var(--font-mono); transition: all .2s; }
+.ms-locked { background: var(--surface2); color: var(--muted); }
+.ms-unlocked { background: var(--lime); color: #1a2a00; }
+.ms-next { background: transparent; color: #666; border: 1px dashed #333; }
+
+.open-tag { font-size: 9px; padding: 1px 5px; border-radius: 10px; background: rgba(37,99,235,0.15); color: #6b9eff; font-family: var(--font-mono); font-weight: 500; margin-left: 4px; vertical-align: middle; }
+
+.chart-panel { background: var(--surface); border-radius: 14px; padding: 18px; border: 1px solid var(--border); margin-top: 28px; }
+.chart-title { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-family: var(--font-mono); margin-bottom: 14px; }
+
+.view-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.view-tab { font-size: 11px; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-family: var(--font-mono); transition: all .15s; }
+.view-tab.active { background: var(--surface2); color: var(--text); border-color: rgba(255,255,255,0.2); }
+.view-tab:hover:not(.active) { color: #aaa; border-color: rgba(255,255,255,0.12); }
+
+@media (max-width: 500px) {
+  .scores-row { grid-template-columns: 1fr 1fr; }
+  .score-card.yearly { grid-column: span 2; }
+  .habits-grid { grid-template-columns: repeat(2, 1fr); }
+  .sc-value { font-size: 26px; }
+}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div>
+    <div class="top-title">Progress tracker</div>
+    <div class="top-sub">progress, not perfection</div>
+  </div>
+  <div class="top-right">
+    <div class="week-nav">
+      <button class="wnav-btn" onclick="changeWeek(-1)" aria-label="previous week"><i class="ti ti-chevron-left"></i></button>
+      <span class="week-lbl" id="week-lbl"></span>
+      <button class="wnav-btn" onclick="changeWeek(1)" aria-label="next week"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    <div class="sync-status" id="sync-status">
+      <div class="sync-dot loading" id="sync-dot"></div>
+      <span id="sync-text" style="color:var(--muted)">connecting...</span>
+    </div>
+  </div>
+</div>
+
+<div class="scores-row">
+  <div class="score-card daily">
+    <div class="sc-label">Daily score</div>
+    <div class="sc-value" id="sc-daily">—</div>
+    <div class="sc-sub">this week</div>
+  </div>
+  <div class="score-card weekly">
+    <div class="sc-label">Weekly score</div>
+    <div class="sc-value" id="sc-weekly">—</div>
+    <div class="sc-sub">targeted habits</div>
+  </div>
+  <div class="score-card yearly">
+    <div class="sc-label">Yearly avg</div>
+    <div class="sc-value" id="sc-yearly">—</div>
+    <div class="sc-sub">all scored habits</div>
+  </div>
+</div>
+
+<div class="section-lbl">Daily habits — days practiced (0–7)</div>
+<div class="habits-grid" id="daily-grid"></div>
+
+<div class="section-lbl">Weekly habits</div>
+<div class="habits-grid" id="weekly-grid"></div>
+
+<div class="chart-panel">
+  <div class="chart-title">Progress overview</div>
+  <div class="view-tabs">
+    <button class="view-tab active" onclick="setView('weekly',this)">Weekly</button>
+    <button class="view-tab" onclick="setView('monthly',this)">Monthly</button>
+    <button class="view-tab" onclick="setView('yearly',this)">Yearly</button>
+  </div>
+  <div style="position:relative;width:100%;height:160px">
+    <canvas id="overviewChart" role="img" aria-label="Habit score chart">Habit performance trend.</canvas>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://lbjdzfkoijtupjqylxmg.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxiamR6ZmtvaWp0dXBqcXlseG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjQ0MjgsImV4cCI6MjA5NjE0MDQyOH0.ZUcMuuCn9iA2mk3xCsEjD13iQWb57SCKfJPvpnGvjKk';
+
+const DAILY = [
+  {id:'dream',      label:'Dream recall',    icon:'ti-moon',           max:7,  color:'#7F77DD'},
+  {id:'meditation', label:'Meditation',      icon:'ti-spa',            max:7,  color:'#1D9E75'},
+  {id:'workout',    label:'Work out',        icon:'ti-barbell',        max:7,  color:'#e85d2a'},
+  {id:'cosmos',     label:'Cosmos',          icon:'ti-atom',           max:7,  color:'#2563eb'},
+  {id:'read',       label:'Read',            icon:'ti-book',           max:7,  color:'#c5f135'},
+  {id:'portuguese', label:'Portuguese',      icon:'ti-language',       max:7,  color:'#EF9F27'},
+  {id:'food',       label:'Food protocol',   icon:'ti-salad',          max:7,  color:'#1D9E75'},
+  {id:'plan',       label:'Plan tomorrow',   icon:'ti-calendar-check', max:7,  color:'#888780'},
+];
+const WEEKLY = [
+  {id:'gn',        label:'G&N',              icon:'ti-camera',       max:4, open:false, color:'#e85d2a'},
+  {id:'journal',   label:'Journal',          icon:'ti-pencil',       max:0, open:true,  color:'#7F77DD'},
+  {id:'yoga',      label:'Yoga & headstand', icon:'ti-user',         max:2, open:false, color:'#1D9E75'},
+  {id:'watch',     label:'Watch',            icon:'ti-device-tv',    max:3, open:false, color:'#2563eb'},
+  {id:'study',     label:'Study',            icon:'ti-school',       max:3, open:false, color:'#EF9F27'},
+  {id:'create',    label:'Create',           icon:'ti-photo-edit',   max:0, open:true,  color:'#c5f135'},
+  {id:'climb',     label:'Climb',            icon:'ti-mountain',     max:0, open:true,  color:'#D85A30'},
+  {id:'poledance', label:'Pole dance',       icon:'ti-star',         max:1, open:false, color:'#D4537E'},
+  {id:'bass',      label:'Bass',             icon:'ti-guitar-pick',  max:3, open:false, color:'#7F77DD'},
+  {id:'sing',      label:'Sing',             icon:'ti-microphone',   max:3, open:false, color:'#1D9E75'},
+];
+
+const MILESTONES = [7,14,21,50,100,200,365];
+let offset = 0;
+let allData = {};
+let saveTimer = null;
+let pendingSaves = {};
+let currentView = 'weekly';
+
+function wKey(o) {
+  const d = new Date();
+  d.setDate(d.getDate() - d.getDay() + 1 + o * 7);
+  const y = d.getFullYear();
+  const w = Math.ceil(((d - new Date(y,0,1)) / 86400000 + new Date(y,0,1).getDay() + 1) / 7);
+  return `${y}-W${String(w).padStart(2,'0')}`;
+}
+function wLabel(o) {
+  const d = new Date();
+  d.setDate(d.getDate() - d.getDay() + 1 + o * 7);
+  const sun = new Date(d); sun.setDate(d.getDate() + 6);
+  const f = dt => dt.toLocaleDateString('en', {month:'short', day:'numeric'});
+  return `${f(d)} – ${f(sun)}`;
+}
+
+function setSyncStatus(state, text) {
+  const dot = document.getElementById('sync-dot');
+  const txt = document.getElementById('sync-text');
+  dot.className = `sync-dot ${state}`;
+  txt.textContent = text;
+  txt.style.color = state === 'ok' ? '#c5f135' : state === 'error' ? '#e24b4a' : state === 'saving' ? '#e85d2a' : 'var(--muted)';
+}
+
+async function sbFetch(path, method='GET', body=null) {
+  const headers = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+  if (method === 'POST') headers['Prefer'] = 'resolution=merge-duplicates,return=minimal';
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, opts);
+  if (!res.ok) { const txt = await res.text(); throw new Error(res.status + ': ' + txt); }
+  if (method === 'GET') return res.json();
+  return true;
+}
+
+async function loadAll() {
+  setSyncStatus('loading', 'loading...');
+  try {
+    const rows = await sbFetch('/habit_logs?select=week_key,habit_id,value&limit=2000');
+    allData = {};
+    rows.forEach(r => {
+      if (!allData[r.week_key]) allData[r.week_key] = {};
+      allData[r.week_key][r.habit_id] = r.value;
+    });
+    setSyncStatus('ok', 'synced');
+    render();
+  } catch(e) {
+    setSyncStatus('error', 'offline — using local');
+    try {
+      const local = localStorage.getItem('ht_fallback');
+      if (local) allData = JSON.parse(local);
+    } catch(_) {}
+    render();
+  }
+}
+
+async function flushSaves() {
+  const toSave = Object.entries(pendingSaves);
+  if (!toSave.length) return;
+  pendingSaves = {};
+  setSyncStatus('saving', 'saving...');
+  try {
+    const rows = toSave.map(([key, val]) => {
+      const [week_key, habit_id] = key.split('|');
+      return { week_key, habit_id, value: val, updated_at: new Date().toISOString() };
+    });
+    await sbFetch('/habit_logs', 'POST', rows);
+    setSyncStatus('ok', 'synced');
+    try { localStorage.setItem('ht_fallback', JSON.stringify(allData)); } catch(_) {}
+  } catch(e) {
+    setSyncStatus('error', 'save failed');
+    Object.entries(toSave).forEach(([k,v]) => { pendingSaves[k] = v; });
+  }
+}
+
+function get(id, o) {
+  const k = wKey(o);
+  return (allData[k] && allData[k][id] !== undefined) ? Number(allData[k][id]) : 0;
+}
+
+function set(id, val) {
+  val = Math.max(0, val);
+  const k = wKey(offset);
+  if (!allData[k]) allData[k] = {};
+  allData[k][id] = val;
+  pendingSaves[`${k}|${id}`] = val;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushSaves, 800);
+  render();
+}
+
+function calcStreak(id) {
+  let streak = 0;
+  for (let i = 1; i <= 365; i++) {
+    if (get(id, offset - i) >= 1) streak++;
+    else break;
+  }
+  return streak;
+}
+function streakColor(s) {
+  if (s >= 200) return '#c5f135';
+  if (s >= 100) return '#EF9F27';
+  if (s >= 50)  return '#e85d2a';
+  if (s >= 21)  return '#2563eb';
+  if (s >= 7)   return '#7F77DD';
+  return '#444';
+}
+function milestonesHTML(streak) {
+  return MILESTONES.map((m, idx) => {
+    const done = streak >= m;
+    const prevDone = idx === 0 || streak >= MILESTONES[idx-1];
+    const isNext = !done && prevDone;
+    const cls = done ? 'ms-unlocked' : isNext ? 'ms-next' : 'ms-locked';
+    return `<span class="ms-badge ${cls}">${m}d</span>`;
+  }).join('');
+}
+
+function renderCard(h) {
+  const cur = get(h.id, offset);
+  const streak = calcStreak(h.id);
+  const sc = streakColor(streak);
+  const pct = h.open ? 0 : Math.min(Math.round((cur / h.max) * 100), 100);
+  const last4 = [3,2,1,0].map(i => get(h.id, offset - i));
+  const dots = last4.map(v => {
+    if (!v) return '#1e1e1e';
+    if (h.open) return v >= 3 ? h.color : v >= 1 ? h.color + '99' : h.color + '44';
+    const p = v / (h.max || 1);
+    return p >= 0.8 ? h.color : p >= 0.4 ? h.color + '88' : '#333';
+  }).map(c => `<div class="dot" style="background:${c}"></div>`).join('');
+
+  const barHTML = !h.open
+    ? `<div class="hbar-bg"><div class="hbar-fill" style="width:${pct}%;background:${h.color}"></div></div>`
+    : '';
+  const maxLabel = h.open
+    ? `<span class="open-tag">open</span>`
+    : `<span class="count-max">/${h.max}</span>`;
+
+  return `<div class="hcard">
+    <div class="hcard-top">
+      <i class="ti ${h.icon} hcard-icon" aria-hidden="true"></i>
+      <div class="hcard-streak">
+        <span class="streak-num" style="color:${sc}">${streak}</span>
+        <i class="ti ti-flame" style="font-size:13px;color:${sc}" aria-hidden="true"></i>
+      </div>
+    </div>
+    <div class="hcard-name">${h.label}</div>
+    <div class="hcard-count">
+      <span class="count-big" style="color:${h.color}">${cur}</span>
+      ${maxLabel}
+    </div>
+    ${barHTML}
+    <div class="count-row">
+      <button class="cnt-btn" onclick="set('${h.id}', ${cur} - 1)" aria-label="decrease">−</button>
+      <span class="cnt-display">${cur}</span>
+      <button class="cnt-btn" onclick="set('${h.id}', ${cur} + 1)" aria-label="increase">+</button>
+    </div>
+    <div class="dots-row">${dots}</div>
+    <div class="milestone-row">${milestonesHTML(streak)}</div>
+  </div>`;
+}
+
+function getWeekScore(o) {
+  let total = 0, possible = 0;
+  DAILY.forEach(h => { total += get(h.id, o); possible += h.max; });
+  WEEKLY.filter(h => !h.open).forEach(h => { total += get(h.id, o); possible += h.max; });
+  return possible > 0 ? Math.round((total / possible) * 100) : null;
+}
+
+function buildWeeklyChart() {
+  const labels = [], scores = [];
+  for (let i = 11; i >= 0; i--) {
+    labels.push(`W${12-i}`);
+    scores.push(getWeekScore(offset - i));
+  }
+  return { labels, scores };
+}
+
+function buildMonthlyChart() {
+  const labels = [], scores = [];
+  const now = new Date();
+  for (let m = 5; m >= 0; m--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+    labels.push(d.toLocaleDateString('en', {month:'short'}));
+    const weeksInMonth = [];
+    for (let w = -52; w <= 0; w++) {
+      const wd = new Date();
+      wd.setDate(wd.getDate() - wd.getDay() + 1 + w * 7);
+      if (wd.getMonth() === d.getMonth() && wd.getFullYear() === d.getFullYear()) {
+        const s = getWeekScore(w);
+        if (s !== null) weeksInMonth.push(s);
+      }
+    }
+    scores.push(weeksInMonth.length ? Math.round(weeksInMonth.reduce((a,b)=>a+b,0)/weeksInMonth.length) : null);
+  }
+  return { labels, scores };
+}
+
+function buildYearlyChart() {
+  const labels = [], scores = [];
+  const now = new Date();
+  for (let y = 2; y >= 0; y--) {
+    const year = now.getFullYear() - y;
+    labels.push(String(year));
+    const weeks = [];
+    for (let w = -104; w <= 0; w++) {
+      const wd = new Date();
+      wd.setDate(wd.getDate() - wd.getDay() + 1 + w * 7);
+      if (wd.getFullYear() === year) {
+        const s = getWeekScore(w);
+        if (s !== null) weeks.push(s);
+      }
+    }
+    scores.push(weeks.length ? Math.round(weeks.reduce((a,b)=>a+b,0)/weeks.length) : null);
+  }
+  return { labels, scores };
+}
+
+let chart = null;
+function renderChart() {
+  const { labels, scores } = currentView === 'weekly' ? buildWeeklyChart()
+    : currentView === 'monthly' ? buildMonthlyChart() : buildYearlyChart();
+
+  if (chart) { chart.destroy(); chart = null; }
+  const ctx = document.getElementById('overviewChart');
+  if (!ctx) return;
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: scores,
+        backgroundColor: scores.map(s =>
+          s === null ? '#1e1e1e' : s >= 80 ? '#c5f135' : s >= 50 ? '#e85d2a' : '#333'
+        ),
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: v => (v.raw ?? '—') + '%' } } },
+      scales: {
+        y: { min: 0, max: 100, ticks: { callback: v => v+'%', font: { size: 11, family: "'DM Mono'" }, color: '#555' }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: 'transparent' } },
+        x: { ticks: { font: { size: 11, family: "'DM Mono'" }, color: '#555' }, grid: { display: false }, border: { color: 'transparent' } }
+      }
+    }
+  });
+}
+
+function setView(v, el) {
+  currentView = v;
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderChart();
+}
+
+function render() {
+  document.getElementById('week-lbl').textContent = wLabel(offset);
+  document.getElementById('daily-grid').innerHTML = DAILY.map(renderCard).join('');
+  document.getElementById('weekly-grid').innerHTML = WEEKLY.map(renderCard).join('');
+
+  let dT=0, dM=0, wT=0, wM=0;
+  DAILY.forEach(h => { dT += get(h.id, offset); dM += h.max; });
+  WEEKLY.filter(h => !h.open).forEach(h => { wT += get(h.id, offset); wM += h.max; });
+  document.getElementById('sc-daily').textContent = dM > 0 ? Math.round((dT/dM)*100)+'%' : '—';
+  document.getElementById('sc-weekly').textContent = wM > 0 ? Math.round((wT/wM)*100)+'%' : '—';
+
+  let yT=0, yM=0, yCnt=0;
+  for (let i = 0; i < 52; i++) {
+    const o = offset - i; let wt=0, wm=0;
+    DAILY.forEach(h => { wt += get(h.id, o); wm += h.max; });
+    WEEKLY.filter(h => !h.open).forEach(h => { wt += get(h.id, o); wm += h.max; });
+    if (wt > 0) { yT += wt; yM += wm; yCnt++; }
+  }
+  document.getElementById('sc-yearly').textContent = yCnt > 0 ? Math.round((yT/yM)*100)+'%' : '—';
+  renderChart();
+}
+
+function changeWeek(d) { offset += d; render(); }
+
+loadAll();
+</script>
+</body>
+</html>
